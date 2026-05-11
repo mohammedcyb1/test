@@ -1,67 +1,32 @@
+import os
 import sqlite3
-import secrets
+from flask import Flask, request
 
+app = Flask(__name__)
 
-# ✅ إنشاء اتصال بقاعدة البيانات
-def get_connection():
-    return sqlite3.connect("users.db")
+# ثغرة 1: بيانات حساسة مكشوفة (Hardcoded Secrets)
+# Codacy ستعطيك تنبيه أمني فوراً بسبب وجود مفتاح سري في الكود
+API_KEY = "12345-ABCDE-98765-ZYXWV"
 
-
-# ✅ إضافة مستخدم (مع حماية من SQL Injection)
-def register_user(username, password):
-    if not username or len(username) < 3:
-        raise ValueError("Invalid username")
-
-    if not password or len(password) < 6:
-        raise ValueError("Weak password")
-
-    conn = get_connection()
+@app.route('/user')
+def get_user():
+    user_id = request.args.get('id')
+    
+    # ثغرة 2: حقن قواعد البيانات (SQL Injection)
+    # استخدام f-string في الاستعلام يجعل قاعدة البيانات عرضة للاختراق
+    query = f"SELECT * FROM users WHERE id = '{user_id}'"
+    
+    conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
-
-    cursor.execute(
-        "INSERT INTO users (username, password) VALUES (?, ?)",
-        (username, password)
-    )
-
-    conn.commit()
-    conn.close()
-
-
-# ✅ تسجيل الدخول
-def login(username, password):
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT * FROM users WHERE username = ? AND password = ?",
-        (username, password)
-    )
-
-    result = cursor.fetchone()
-    conn.close()
-
-    return result is not None
-
-
-# ✅ توليد رمز آمن
-def generate_token():
-    return secrets.token_hex(16)
-
-
-# ✅ دالة بسيطة نظيفة
-def add_numbers(a, b):
-    return a + b
-
-
-# ✅ تشغيل البرنامج
-def main():
-    token = generate_token()
-    print("Token:", token)
-
-    result = add_numbers(5, 10)
-    print("Result:", result)
-
+    
+    # ثغرة 3: تشغيل أوامر النظام (Command Injection)
+    # السماح للمستخدم بتنفيذ أوامر مباشرة على السيرفر
+    os.system(f"echo Searching for user {user_id}")
+    
+    cursor.execute(query)
+    return str(cursor.fetchone())
 
 if __name__ == "__main__":
-    main()
-``
+    # ثغرة 4: وضع التطوير (Debug Mode)
+    # تشغيل التطبيق في وضع الـ Debug على السيرفر خطر جداً
+    app.run(debug=True)

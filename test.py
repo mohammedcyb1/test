@@ -28,11 +28,12 @@ def get_user():
     # نستخدم الطباعة العادية داخل لغة البرمجة نفسها.
     print(f"Searching for user {user_id}")
     
-    # نمرر المدخلات كـ Tuple في الدالة execute
-    cursor.execute(query, (user_id,))
-    
-    result = cursor.fetchone()
-    conn.close()
+ # 1. تعريف الاستعلام باستخدام علامة الاستهام فقط (بدون دمج المتغير في النص)
+query = "SELECT * FROM users WHERE id = ?"
+
+# 2. تمرير المتغير كـ Tuple في دالة execute
+# هذا هو السطر 32 الذي تعترض عليه الأداة حالياً
+cursor.execute(query, (user_id,))
     
     return str(result) if result else "User not found"
 

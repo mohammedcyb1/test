@@ -1,130 +1,99 @@
-import os
-import pickle
 import sqlite3
-import hashlib
+import bcrypt
+import secrets
 import subprocess
+from pathlib import Path
 
-# 🔴 Hardcoded secret key
-SECRET_KEY = "super_secret_key_123"
-
-# 🔴 Weak hashing (MD5)
+# ✅ Secure password hashing
 def hash_password(password):
-    return hashlib.md5(password.encode()).hexdigest()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+
+def check_password(password, hashed):
+    return bcrypt.checkpw(password.encode(), hashed)
 
 
-# 🔴 Authentication bypass (logic flaw)
-def authenticate(username, password):
-    if username == "admin":
-        return True  # BUG 🚨
-
-    conn = sqlite3.connect("users.db")
+# ✅ Secure login (NO SQL Injection)
+def login(username, password, db_path="users.db"):
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    cursor.execute(f"SELECT * FROM users WHERE username='{username}' AND password='{password}'")
+    cursor.execute(
+        "SELECT password FROM users WHERE username = ?",
+        (username,)
+    )
+
     result = cursor.fetchone()
-
     conn.close()
-    return result is not None
+
+    if result and check_password(password, result[0]):
+        return True
+    return False
 
 
-# 🔴 SQL Injection again
-def get_user_data(user_id):
-    conn = sqlite3.connect("users.db")
-    cursor = conn.cursor()
-
-    query = f"SELECT * FROM users WHERE id = {user_id}"
-    cursor.execute(query)
-
-    data = cursor.fetchall()
-    conn.close()
-    return data
+# ✅ Secure random token
+def generate_token():
+    return secrets.token_hex(16)
 
 
-# 🔴 Command Injection
-def delete_file(filename):
-    os.system("rm -rf " + filename)
+# ✅ Safe file reading (protect from path traversal)
+def read_file_safe(filename):
+    base_dir = Path("files").resolve()
+    file_path = (base_dir / filename).resolve()
 
+    if not str(file_path).startswith(str(base_dir)):
+        raise ValueError("Access denied")
 
-# 🔴 Insecure deserialization (خطير جدًا)
-def load_user_session(file):
-    with open(file, "rb") as f:
-        return pickle.load(f)  # 🚨 ممكن تنفيذ كود ضار
-
-
-# 🔴 Path Traversal
-def read_file(filename):
-    with open("files/" + filename, "r") as f:
+    with open(file_path, "r") as f:
         return f.read()
 
 
-# 🔴 Sensitive data exposure
-def print_env():
-    return os.environ
+# ✅ Safe command execution
+def run_command_safe(command):
+    allowed_commands = ["echo", "ls"]
+
+    if command[0] not in allowed_commands:
+        raise ValueError("Command not allowed")
+
+    subprocess.run(command, check=True)
 
 
-# 🔴 Weak random token
-import random
-def create_token():
-    return str(random.random())
+# ✅ Input validation
+def register_user(username, password):
+    if not username or len(username) < 3:
+        raise ValueError("Invalid username")
 
+    if not password or len(password) < 6:
+        raise ValueError("Weak password")
 
-# 🔴 Missing auth check
-def delete_user(user_id):
+    hashed = hash_password(password)
+
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM users WHERE id=" + str(user_id))
+    cursor.execute(
+        "INSERT INTO users (username, password) VALUES (?, ?)",
+        (username, hashed)
+    )
+
     conn.commit()
     conn.close()
 
 
-# 🔴 Race condition (conceptual)
-shared_counter = 0
-
-def increment():
-    global shared_counter
-    for _ in range(1000):
-        shared_counter += 1
-
-
-# 🔴 Code duplication
-def sum1():
-    a = 1
-    b = 2
-    return a + b
-
-def sum2():
-    a = 1
-    b = 2
+# ✅ Clean code (no duplication)
+def add_numbers(a, b):
     return a + b
 
 
-# 🔴 Bug (crash)
-def crash():
-    x = 10
-    y = "20"
-    return x + y
-
-
-# 🔴 Very complex function
-def complex_logic(x):
-    if x > 0:
-        if x < 10:
-            if x % 2 == 0:
-                if x > 5:
-                    if x > 7:
-                        return x * 3
-                    else:
-                        return x * 2
-                else:
-                    return x + 1
-            else:
-                return x - 1
-        else:
-            return x * 10
-    else:
+# ✅ Simple and readable function
+def process_value(x):
+    if x <= 0:
         return 0
 
+    if x < 10 and x % 2 == 0:
+        return x * 2
 
-print("App running")
+    return x
+
+
+print("✅ Application running safely")
 ``

@@ -1,32 +1,42 @@
 import os
 import sqlite3
-from flask import Flask, request
+from flask import Flask, request, abort
 
 app = Flask(__name__)
 
-# ثغرة 1: بيانات حساسة مكشوفة (Hardcoded Secrets)
-# Codacy ستعطيك تنبيه أمني فوراً بسبب وجود مفتاح سري في الكود
-API_KEY = "12345-ABCDE-98765-ZYXWV"
+# 1. حل مشكلة البيانات الحساسة:
+# بدلاً من كتابة المفتاح هنا، نسحبه من "متغيرات البيئة" (Environment Variables)
+API_KEY = os.getenv("MY_APP_API_KEY")
 
 @app.route('/user')
 def get_user():
     user_id = request.args.get('id')
     
-    # ثغرة 2: حقن قواعد البيانات (SQL Injection)
-    # استخدام f-string في الاستعلام يجعل قاعدة البيانات عرضة للاختراق
-    query = f"SELECT * FROM users WHERE id = '{user_id}'"
+    # التأكد من وجود المدخلات لمنع الأخطاء المفاجئة
+    if not user_id:
+        abort(400, description="Missing user ID")
+
+    # 2. حل ثغرة SQL Injection:
+    # نستخدم البارامترات (?) بدلاً من f-string. المحرك سيتكفل بتنقية المدخلات.
+    query = "SELECT * FROM users WHERE id = ?"
     
     conn = sqlite3.connect('database.db')
     cursor = conn.cursor()
     
-    # ثغرة 3: تشغيل أوامر النظام (Command Injection)
-    # السماح للمستخدم بتنفيذ أوامر مباشرة على السيرفر
-    os.system(f"echo Searching for user {user_id}")
+    # 3. حل ثغرة Command Injection:
+    # تجنب استخدام os.system نهائياً مع مدخلات المستخدم. 
+    # نستخدم الطباعة العادية داخل لغة البرمجة نفسها.
+    print(f"Searching for user {user_id}")
     
-    cursor.execute(query)
-    return str(cursor.fetchone())
+    # نمرر المدخلات كـ Tuple في الدالة execute
+    cursor.execute(query, (user_id,))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    return str(result) if result else "User not found"
 
 if __name__ == "__main__":
-    # ثغرة 4: وضع التطوير (Debug Mode)
-    # تشغيل التطبيق في وضع الـ Debug على السيرفر خطر جداً
-    app.run(debug=True)
+    # 4. حل ثغرة Debug Mode:
+    # في المشاريع الحقيقية، يجب دائماً تعطيل وضع التصحيح
+    app.run(debug=False)

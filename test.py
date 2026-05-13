@@ -4,7 +4,6 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# Secure configuration
 app.config["SECRET_KEY"] = os.environ.get(
     "SECRET_KEY",
     "change-this-secret"
@@ -12,47 +11,30 @@ app.config["SECRET_KEY"] = os.environ.get(
 
 UPLOAD_FOLDER = "files"
 
-# Mock data instead of SQL database
 USERS = [
     {
         "id": 1,
-        "username": "admin",
-        "password": "admin123"
+        "username": os.environ.get("ADMIN_USERNAME", "admin"),
+        "password": os.environ.get("ADMIN_PASSWORD", "")
     },
     {
         "id": 2,
-        "username": "user",
-        "password": "user123"
+        "username": os.environ.get("NORMAL_USERNAME", "user"),
+        "password": os.environ.get("NORMAL_PASSWORD", "")
     }
 ]
 
 PRODUCTS = [
-    {
-        "id": 1,
-        "name": "Laptop"
-    },
-    {
-        "id": 2,
-        "name": "Mouse"
-    },
-    {
-        "id": 3,
-        "name": "Keyboard"
-    }
+    {"id": 1, "name": "Laptop"},
+    {"id": 2, "name": "Mouse"},
+    {"id": 3, "name": "Keyboard"}
 ]
 
 
 @app.route("/login", methods=["POST"])
 def login():
-    username = request.form.get(
-        "username",
-        ""
-    )
-
-    password = request.form.get(
-        "password",
-        ""
-    )
+    username = request.form.get("username", "")
+    password = request.form.get("password", "")
 
     user = next(
         (
@@ -64,21 +46,14 @@ def login():
     )
 
     if user:
-        return jsonify({
-            "message": "Login successful"
-        })
+        return jsonify({"message": "Login successful"})
 
-    return jsonify({
-        "message": "Invalid credentials"
-    }), 401
+    return jsonify({"message": "Invalid credentials"}), 401
 
 
 @app.route("/search")
 def search():
-    keyword = request.args.get(
-        "q",
-        ""
-    ).lower()
+    keyword = request.args.get("q", "").lower()
 
     results = [
         product
@@ -91,28 +66,12 @@ def search():
 
 @app.route("/read")
 def read_file():
-    filename = request.args.get(
-        "file",
-        ""
-    )
+    filename = request.args.get("file", "")
+    safe_name = secure_filename(filename)
 
-    # Prevent path traversal
-    safe_name = secure_filename(
-        filename
-    )
-
-    file_path = os.path.join(
-        UPLOAD_FOLDER,
-        safe_name
-    )
-
-    abs_folder = os.path.abspath(
-        UPLOAD_FOLDER
-    )
-
-    abs_file = os.path.abspath(
-        file_path
-    )
+    file_path = os.path.join(UPLOAD_FOLDER, safe_name)
+    abs_folder = os.path.abspath(UPLOAD_FOLDER)
+    abs_file = os.path.abspath(file_path)
 
     if not abs_file.startswith(abs_folder):
         abort(403)
@@ -120,30 +79,17 @@ def read_file():
     if not os.path.isfile(abs_file):
         abort(404)
 
-    with open(
-        abs_file,
-        "r",
-        encoding="utf-8"
-    ) as file:
+    with open(abs_file, "r", encoding="utf-8") as file:
         content = file.read()
 
-    return jsonify({
-        "content": content
-    })
+    return jsonify({"content": content})
 
 
 @app.route("/delete", methods=["POST"])
 def delete_user():
-    user_id = request.form.get(
-        "id",
-        ""
-    )
+    user_id = request.form.get("id", "")
 
-    # Basic authorization check
-    is_admin = (
-        request.headers.get("X-Admin")
-        == "true"
-    )
+    is_admin = request.headers.get("X-Admin") == "true"
 
     if not is_admin:
         abort(403)
@@ -151,37 +97,27 @@ def delete_user():
     if not user_id.isdigit():
         abort(400)
 
-    return jsonify({
-        "message": "User deleted safely"
-    })
+    return jsonify({"message": "User deleted safely"})
 
 
 @app.errorhandler(400)
 def bad_request(error):
-    return jsonify({
-        "error": "Bad request"
-    }), 400
+    return jsonify({"error": "Bad request"}), 400
 
 
 @app.errorhandler(403)
 def forbidden(error):
-    return jsonify({
-        "error": "Forbidden"
-    }), 403
+    return jsonify({"error": "Forbidden"}), 403
 
 
 @app.errorhandler(404)
 def not_found(error):
-    return jsonify({
-        "error": "Not found"
-    }), 404
+    return jsonify({"error": "Not found"}), 404
 
 
 @app.errorhandler(500)
 def internal_error(error):
-    return jsonify({
-        "error": "Internal server error"
-    }), 500
+    return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":

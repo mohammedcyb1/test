@@ -30,13 +30,16 @@ def login():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Safe query
+    # Secure named parameter query
     cursor.execute(
-        "SELECT * FROM users WHERE username = ?",
-        (username,)
+        "SELECT * FROM users WHERE username = :username",
+        {
+            "username": username
+        }
     )
 
     user = cursor.fetchone()
+
     conn.close()
 
     if user and check_password_hash(
@@ -59,10 +62,12 @@ def search():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Safe query without string concatenation
+    # Secure named parameter query
     cursor.execute(
-        "SELECT * FROM products WHERE name = ?",
-        (keyword,)
+        "SELECT * FROM products WHERE name = :keyword",
+        {
+            "keyword": keyword
+        }
     )
 
     results = [
@@ -132,10 +137,12 @@ def delete_user():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Safe query
+    # Secure named parameter query
     cursor.execute(
-        "DELETE FROM users WHERE id = ?",
-        (user_id,)
+        "DELETE FROM users WHERE id = :user_id",
+        {
+            "user_id": int(user_id)
+        }
     )
 
     conn.commit()

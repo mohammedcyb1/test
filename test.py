@@ -30,7 +30,14 @@ def login():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-   
+    # Secure named parameter query
+    cursor.execute(
+        "SELECT * FROM users WHERE username = :username",
+        {
+            "username": username
+        }
+    )
+
     user = cursor.fetchone()
 
     conn.close()

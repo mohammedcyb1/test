@@ -1,13 +1,14 @@
 from flask import Flask, request, jsonify, abort
 import sqlite3
-import subprocess
 import os
 from werkzeug.security import check_password_hash
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-only-change-me")
+# Load secret key securely from environment variable
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this-secret")
+
 DATABASE = "users.db"
 UPLOAD_FOLDER = "files"
 
@@ -26,7 +27,7 @@ def login():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Safe parameterized query
+    # Secure parameterized query
     cursor.execute(
         "SELECT * FROM users WHERE username = ?",
         (username,)
@@ -48,7 +49,7 @@ def search():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Safe parameterized query
+    # Secure parameterized query
     cursor.execute(
         "SELECT * FROM products WHERE name LIKE ?",
         (f"%{keyword}%",)
@@ -60,34 +61,18 @@ def search():
     return jsonify(results)
 
 
-@app.route("/ping")
-def ping():
-    host = request.args.get("host", "")
-
-    # Basic input validation
-    if not host.replace(".", "").replace("-", "").isalnum():
-        abort(400, "Invalid host")
-
-    # Avoid shell=True
-    result = subprocess.check_output(
-        ["ping", "-c", "1", host],
-        text=True,
-        timeout=5
-    )
-
-    return jsonify({"result": result})
-
-
 @app.route("/read")
 def read_file():
     filename = request.args.get("file", "")
+
+    # Prevent path traversal
     safe_name = secure_filename(filename)
 
     file_path = os.path.join(UPLOAD_FOLDER, safe_name)
+
     abs_folder = os.path.abspath(UPLOAD_FOLDER)
     abs_file = os.path.abspath(file_path)
 
-    # Prevent path traversal
     if not abs_file.startswith(abs_folder):
         abort(403, "Access denied")
 
@@ -102,20 +87,21 @@ def read_file():
 
 @app.route("/delete", methods=["POST"])
 def delete_user():
-    user_id = request.form.get("id")
+    user_id = request.form.get("id", "")
 
-    # Example simple authorization check
+    # Simple authorization example
     is_admin = request.headers.get("X-Admin") == "true"
 
     if not is_admin:
         abort(403, "Admin access required")
 
-    if not user_id or not user_id.isdigit():
+    if not user_id.isdigit():
         abort(400, "Invalid user ID")
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Secure parameterized query
     cursor.execute(
         "DELETE FROM users WHERE id = ?",
         (user_id,)
@@ -127,5 +113,26 @@ def delete_user():
     return jsonify({"message": "User deleted"})
 
 
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({"error": str(error)}), 400
+
+
+@app.errorhandler(403)
+def forbidden(error):
+    return jsonify({"error": str(error)}), 403
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": str(error)}), 404
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({"error": "Internal server error"}), 500
+
+
 if __name__ == "__main__":
+    # Debug disabled for security
     app.run(host="127.0.0.1", port=5000, debug=False)

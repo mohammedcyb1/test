@@ -6,8 +6,11 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-# Load secret key securely from environment variable
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-this-secret")
+# Secure configuration
+app.config["SECRET_KEY"] = os.environ.get(
+    "SECRET_KEY",
+    "change-this-secret"
+)
 
 DATABASE = "users.db"
 UPLOAD_FOLDER = "files"
@@ -27,7 +30,7 @@ def login():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Secure parameterized query
+    # Safe query
     cursor.execute(
         "SELECT * FROM users WHERE username = ?",
         (username,)
@@ -36,10 +39,18 @@ def login():
     user = cursor.fetchone()
     conn.close()
 
-    if user and check_password_hash(user["password"], password):
-        return jsonify({"message": "Login successful"})
+    if user and check_password_hash(
+        user["password"],
+        password
+    ):
+        return jsonify({
+            "message": "Login successful"
+        })
 
-    return jsonify({"message": "Invalid username or password"}), 401
+    return jsonify({
+        "message": "Invalid credentials"
+    }), 401
+
 
 @app.route("/search")
 def search():
@@ -48,14 +59,17 @@ def search():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    search_pattern = "%" + keyword + "%"
-
+    # Safe query without string concatenation
     cursor.execute(
-        "SELECT * FROM products WHERE name LIKE ?",
-        (search_pattern,)
+        "SELECT * FROM products WHERE name = ?",
+        (keyword,)
     )
 
-    results = [dict(row) for row in cursor.fetchall()]
+    results = [
+        dict(row)
+        for row in cursor.fetchall()
+    ]
+
     conn.close()
 
     return jsonify(results)
@@ -68,40 +82,57 @@ def read_file():
     # Prevent path traversal
     safe_name = secure_filename(filename)
 
-    file_path = os.path.join(UPLOAD_FOLDER, safe_name)
+    file_path = os.path.join(
+        UPLOAD_FOLDER,
+        safe_name
+    )
 
-    abs_folder = os.path.abspath(UPLOAD_FOLDER)
-    abs_file = os.path.abspath(file_path)
+    abs_folder = os.path.abspath(
+        UPLOAD_FOLDER
+    )
+
+    abs_file = os.path.abspath(
+        file_path
+    )
 
     if not abs_file.startswith(abs_folder):
-        abort(403, "Access denied")
+        abort(403)
 
     if not os.path.exists(abs_file):
-        abort(404, "File not found")
+        abort(404)
 
-    with open(abs_file, "r", encoding="utf-8") as f:
+    with open(
+        abs_file,
+        "r",
+        encoding="utf-8"
+    ) as f:
         content = f.read()
 
-    return jsonify({"content": content})
+    return jsonify({
+        "content": content
+    })
 
 
 @app.route("/delete", methods=["POST"])
 def delete_user():
     user_id = request.form.get("id", "")
 
-    # Simple authorization example
-    is_admin = request.headers.get("X-Admin") == "true"
+    # Simple authorization check
+    is_admin = (
+        request.headers.get("X-Admin")
+        == "true"
+    )
 
     if not is_admin:
-        abort(403, "Admin access required")
+        abort(403)
 
     if not user_id.isdigit():
-        abort(400, "Invalid user ID")
+        abort(400)
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Secure parameterized query
+    # Safe query
     cursor.execute(
         "DELETE FROM users WHERE id = ?",
         (user_id,)
@@ -110,29 +141,43 @@ def delete_user():
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "User deleted"})
+    return jsonify({
+        "message": "User deleted"
+    })
 
 
 @app.errorhandler(400)
 def bad_request(error):
-    return jsonify({"error": str(error)}), 400
+    return jsonify({
+        "error": "Bad request"
+    }), 400
 
 
 @app.errorhandler(403)
 def forbidden(error):
-    return jsonify({"error": str(error)}), 403
+    return jsonify({
+        "error": "Forbidden"
+    }), 403
 
 
 @app.errorhandler(404)
 def not_found(error):
-    return jsonify({"error": str(error)}), 404
+    return jsonify({
+        "error": "Not found"
+    }), 404
 
 
 @app.errorhandler(500)
 def internal_error(error):
-    return jsonify({"error": "Internal server error"}), 500
+    return jsonify({
+        "error": "Internal server error"
+    }), 500
 
 
 if __name__ == "__main__":
-    # Debug disabled for security
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    # Debug disabled
+    app.run(
+        host="127.0.0.1",
+        port=5000,
+        debug=False
+    )

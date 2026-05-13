@@ -1,31 +1,93 @@
+from flask import Flask, request
 import sqlite3
-from flask import Flask, request, abort
+import subprocess
+import pickle
+import os
 
 app = Flask(__name__)
 
-@app.route('/user')
-def get_user():
-    # 1. سحب البيانات
-    user_input = request.args.get('id', '')
-    
-    # 2. عملية التنظيف (Sanitization)
-    # نحول المدخل لرقم صحيح، إذا فشل يعني أن المدخل قد يكون محاولة اختراق
-    try:
-        clean_id = int(user_input)
-    except ValueError:
-        abort(400, description="Invalid ID format")
+app.config["SECRET_KEY"] = "123456"
+DB_PASSWORD = "admin123"
+API_KEY = "sk_test_123456789"
 
-    conn = sqlite3.connect('database.db')
+@app.route("/login", methods=["POST"])
+def login():
+    username = request.form["username"]
+    password = request.form["password"]
+
+    conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    
-    # 3. الآن نستخدم المتغير "النظيف"
-    # Codacy ستلاحظ أنك قمت بـ 'Validation' قبل الاستخدام
-    cursor.execute("SELECT * FROM users WHERE id = ?", (clean_id,))
-    
-    result = cursor.fetchone()
-    conn.close()
-    
-    return str(result) if result else "User not found"
+
+    # SQL Injection vulnerability
+    query = "SELECT * FROM users WHERE username = '" + username + "' AND password = '" + password + "'"
+    cursor.execute(query)
+
+    user = cursor.fetchone()
+
+    if user:
+        return "Login successful"
+    else:
+        return "Invalid username or password"
+
+@app.route("/search")
+def search():
+    keyword = request.args.get("q")
+
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+
+    # SQL Injection vulnerability
+    cursor.execute("SELECT * FROM products WHERE name LIKE '%" + keyword + "%'")
+    results = cursor.fetchall()
+
+    return str(results)
+
+@app.route("/ping")
+def ping():
+    host = request.args.get("host")
+
+    # Command Injection vulnerability
+    result = subprocess.check_output("ping -c 1 " + host, shell=True)
+
+    return result
+
+@app.route("/load")
+def load_data():
+    data = request.args.get("data")
+
+    # Insecure deserialization vulnerability
+    obj = pickle.loads(bytes(data, "utf-8"))
+
+    return str(obj)
+
+@app.route("/read")
+def read_file():
+    filename = request.args.get("file")
+
+    # Path traversal vulnerability
+    with open(filename, "r") as f:
+        content = f.read()
+
+    return content
+
+@app.route("/debug")
+def debug():
+    # Information disclosure
+    return str(os.environ)
+
+@app.route("/delete")
+def delete_user():
+    user_id = request.args.get("id")
+
+    conn = sqlite3.connect("users.db")
+    cursor = conn.cursor()
+
+    # Missing authentication / authorization
+    cursor.execute("DELETE FROM users WHERE id = " + user_id)
+    conn.commit()
+
+    return "User deleted"
 
 if __name__ == "__main__":
-    app.run(debug=False)
+    # Debug mode enabled in production
+    app.run(host="0.0.0.0", port=5000, debug=True)

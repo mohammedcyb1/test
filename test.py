@@ -41,7 +41,6 @@ def login():
 
     return jsonify({"message": "Invalid username or password"}), 401
 
-
 @app.route("/search")
 def search():
     keyword = request.args.get("q", "")
@@ -49,10 +48,11 @@ def search():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Secure parameterized query
+    search_pattern = "%" + keyword + "%"
+
     cursor.execute(
         "SELECT * FROM products WHERE name LIKE ?",
-        (f"%{keyword}%",)
+        (search_pattern,)
     )
 
     results = [dict(row) for row in cursor.fetchall()]
